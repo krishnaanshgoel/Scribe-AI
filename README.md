@@ -1,5 +1,7 @@
 # ScribeAI - AI-Powered Audio Scribing and Meeting Transcription App
 
+📹 **[Watch Demo Video](https://youtu.be/emZ5RCFkR3o)**
+
 > **A real-time audio transcription tool** that captures and scribes audio from direct microphone input or shared meeting tabs (Google Meet/Zoom), streams to Gemini for live transcription, and stores sessions in PostgreSQL.
 
 [![Next.js](https://img.shields.io/badge/Next.js-14+-black)](https://nextjs.org/)
