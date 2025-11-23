@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Better Auth required tables
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Better Auth relations
+  accounts      Account[]
+  sessions      Session[]
+  
+  // App relations
+  appSessions   AppSession[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  accountId         String
+  providerId        String
+  accessToken       String?
+  refreshToken      String?
+  idToken           String?
+  accessTokenExpiresAt DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope             String?
+  password          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("sessions")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, value])
+}
+
+// App-specific User Profile (extends Better Auth user)
+// This model stores additional app-specific user data
+model UserProfile {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  bio           String?
+  preferences   Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("user_profiles")
+}
+
+// App Session model - stores transcription sessions
+model AppSession {
+  id              String          @id @default(cuid())
+  title           String          @default("Untitled Session")
+  userId          String
+  recordingMode   RecordingMode    @default(MIC) // MIC or TAB
+  status          SessionStatus   @default(RECORDING)
+  duration        Int             @default(0) // Duration in seconds
+  transcript      String?         @db.Text // Full transcript text
+  summary         String?         @db.Text // AI-generated summary
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  startedAt       DateTime?
+  pausedAt        DateTime?
+  stoppedAt       DateTime?
+  completedAt     DateTime?
+
+  // Relations
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transcriptChunks TranscriptChunk[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("app_sessions")
+}
+
+// TranscriptChunk model - stores incremental transcript chunks for streaming
+// This allows us to handle long sessions by chunking transcriptions
+model TranscriptChunk {
+  id              String    @id @default(cuid())
+  sessionId       String
+  chunkIndex      Int       // Order of chunks (0, 1, 2, ...)
+  transcript      String    @db.Text // Chunk transcript text
+  startTime       Int       // Start time in seconds from session start
+  endTime         Int       // End time in seconds from session start
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  session         AppSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, chunkIndex])
+  @@map("transcript_chunks")
+}
+
+// Enums
+enum RecordingMode {
+  MIC  // Microphone input
+  TAB  // Tab/Meeting share
+}
+
+enum SessionStatus {
+  RECORDING   // Currently recording
+  PAUSED      // Recording paused
+  PROCESSING  // Stopped, generating summary
+  COMPLETED   // Fully processed and ready
+  FAILED      // Error occurred
+}
+
